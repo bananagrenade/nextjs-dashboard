@@ -1,0 +1,96 @@
+stages:
+  - build
+  - build image
+  - upload
+
+variables:
+  AWS_ECR_REGISTRY: 590183655350.dkr.ecr.us-east-1.amazonaws.com
+  ARTIFACT_NAME: ""
+  ARTIFACT_PATH: ""
+  APP_NAME: connections
+  PROJECT_VERSION: ""
+  AWS_DEFAULT_REGION: us-east-1
+  DOCKER_HOST: tcp://docker:2375
+  AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+  AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+  ECR_REPOSITORY_URI: "your-ecr-repository-uri" # Replace with your ECR repository URI
+
+.install_java: &install_java
+  # Install OpenJDK
+  - apt-get update -qq > /dev/null && apt-get install -yq openjdk-17-jdk > /dev/null 2>&1
+  - wget -q https://services.gradle.org/distributions/gradle-7.4-bin.zip
+  - unzip -q -d /opt/gradle gradle-7.4-bin.zip
+  - export PATH=$PATH:/opt/gradle/gradle-7.4/bin
+
+publish_image:
+  image:
+    name: amazon/aws-cli
+    entrypoint: [""]
+  stage: build image
+  services:
+    - docker:dind
+  before_script:
+    - amazon-linux-extras install docker
+    - aws --version
+    - docker --version
+  script:
+    - echo hi
+    - docker build -t $AWS_ECR_REGISTRY/$APP_NAME:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHA .
+    - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ECR_REGISTRY
+    - docker push $AWS_ECR_REGISTRY/$APP_NAME:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHA
+
+build_job:
+  stage: build
+  script:
+    - *install_java
+    - ./gradlew bootJar
+    - PROJECT_VERSION=$(grep -oP "version\s*=\s*'\K\d+\.\d+\.\d+" build.gradle)
+  artifacts:
+    name: app.jar
+    paths:
+      - build/libs
+#
+#test_job:
+#  stage: build
+#  script:
+#    - *install_java
+#    - echo "Running tests..."
+#    - ./gradlew test
+#  allow_failure: false
+#
+##dependency_submission_job:
+##  stage: build
+##  script:
+##    - echo "Performing dependency submission..."
+##    - ./gradlew dependencySubmission
+##  artifacts:
+##    paths:
+##      - build/reports/
+##      - build/dependency-graph/
+##  allow_failure: false
+#
+#docker_build_job:
+#  stage: build
+#  script:
+#    - echo "Building Docker image..."
+#    - echo $CI_REGISTRY_IMAGE
+#    - echo $ARTIFACT_PATH
+#    - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG .
+#  allow_failure: false
+#  needs:
+#    - build_job
+#  only:
+#    - main
+#
+#docker_push_job:
+#  stage: upload
+#  script:
+#    - echo "Logging in to Amazon ECR..."
+#    - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+#    - echo "Tagging Docker image for ECR..."
+#    - docker tag $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG $ECR_REPOSITORY_URI:$CI_COMMIT_REF_SLUG
+#    - echo "Pushing Docker image to Amazon ECR..."
+#    - docker push $ECR_REPOSITORY_URI:$CI_COMMIT_REF_SLUG
+#  allow_failure: false
+#  dependencies:
+#    - docker_build_job
