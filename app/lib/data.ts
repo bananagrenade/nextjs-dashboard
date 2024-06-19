@@ -15,6 +15,30 @@ export async function fetchRevenue() {
   // Add noStore() here to prevent the response from being cached.
   // This is equivalent to in fetch(..., {cache: 'no-store'}).
   noStore();
+  // console.log('hi');
+
+  // const url = 'http://localhost:8080/users';
+  // const headers = new Headers({
+  //   'Authorization': 'Basic dXNlcjpwYXNzd29yZA==',
+  //   'Cookie': 'JSESSIONID=1806B24B48E5B54138544B2E5774FF4B'
+  // });
+
+  // fetch(url, {
+  //   method: 'GET', // Default method, can be omitted
+  //   headers: headers
+  // })
+  //   .then(response => {
+  //     if (!response.ok) {
+  //       throw new Error('Network response was not ok ' + response.statusText);
+  //     }
+  //     return response.json(); // Or response.text(), response.blob(), etc.
+  //   })
+  //   .then(data => {
+  //     console.log(data);
+  //   })
+  //   .catch(error => {
+  //     console.error('There was a problem with your fetch operation:', error);
+  //   });
 
   try {
     const data = await sql<Revenue>`SELECT * FROM revenue`;

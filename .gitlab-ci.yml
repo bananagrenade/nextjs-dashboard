@@ -1,96 +1,44 @@
 stages:
+  - install
   - build
-  - build image
-  - upload
+  - deploy
 
 variables:
-  AWS_ECR_REGISTRY: 590183655350.dkr.ecr.us-east-1.amazonaws.com
-  ARTIFACT_NAME: ""
-  ARTIFACT_PATH: ""
-  APP_NAME: connections
-  PROJECT_VERSION: ""
-  AWS_DEFAULT_REGION: us-east-1
-  DOCKER_HOST: tcp://docker:2375
-  AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
-  AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
-  ECR_REPOSITORY_URI: "your-ecr-repository-uri" # Replace with your ECR repository URI
+  NODE_ENV: 'production'
+  APP_NAME: 'my-nextjs-app'
+  AWS_ECR_REGISTRY: '123456789012.dkr.ecr.us-west-2.amazonaws.com' # Update with your AWS ECR registry
+  AWS_REGION: 'us-west-2' # Update with your AWS region
 
-.install_java: &install_java
-  # Install OpenJDK
-  - apt-get update -qq > /dev/null && apt-get install -yq openjdk-17-jdk > /dev/null 2>&1
-  - wget -q https://services.gradle.org/distributions/gradle-7.4-bin.zip
-  - unzip -q -d /opt/gradle gradle-7.4-bin.zip
-  - export PATH=$PATH:/opt/gradle/gradle-7.4/bin
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - node_modules/
 
-publish_image:
-  image:
-    name: amazon/aws-cli
-    entrypoint: [""]
-  stage: build image
-  services:
-    - docker:dind
-  before_script:
-    - amazon-linux-extras install docker
-    - aws --version
-    - docker --version
+before_script:
+  - apt-get update -qq && apt-get install -yqq git curl
+  - curl -sL https://deb.nodesource.com/setup_14.x | bash -
+  - apt-get install -yqq nodejs
+  - npm install -g npm@latest
+
+install_dependencies:
+  stage: install
   script:
-    - echo hi
-    - docker build -t $AWS_ECR_REGISTRY/$APP_NAME:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHA .
-    - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ECR_REGISTRY
-    - docker push $AWS_ECR_REGISTRY/$APP_NAME:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHA
+    - npm ci
 
-build_job:
+build:
   stage: build
   script:
-    - *install_java
-    - ./gradlew bootJar
-    - PROJECT_VERSION=$(grep -oP "version\s*=\s*'\K\d+\.\d+\.\d+" build.gradle)
+    - npm run build
   artifacts:
-    name: app.jar
     paths:
-      - build/libs
-#
-#test_job:
-#  stage: build
-#  script:
-#    - *install_java
-#    - echo "Running tests..."
-#    - ./gradlew test
-#  allow_failure: false
-#
-##dependency_submission_job:
-##  stage: build
-##  script:
-##    - echo "Performing dependency submission..."
-##    - ./gradlew dependencySubmission
-##  artifacts:
-##    paths:
-##      - build/reports/
-##      - build/dependency-graph/
-##  allow_failure: false
-#
-#docker_build_job:
-#  stage: build
-#  script:
-#    - echo "Building Docker image..."
-#    - echo $CI_REGISTRY_IMAGE
-#    - echo $ARTIFACT_PATH
-#    - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG .
-#  allow_failure: false
-#  needs:
-#    - build_job
-#  only:
-#    - main
-#
-#docker_push_job:
-#  stage: upload
-#  script:
-#    - echo "Logging in to Amazon ECR..."
-#    - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
-#    - echo "Tagging Docker image for ECR..."
-#    - docker tag $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG $ECR_REPOSITORY_URI:$CI_COMMIT_REF_SLUG
-#    - echo "Pushing Docker image to Amazon ECR..."
-#    - docker push $ECR_REPOSITORY_URI:$CI_COMMIT_REF_SLUG
-#  allow_failure: false
-#  dependencies:
-#    - docker_build_job
+      - .next
+      - out
+
+deploy:
+  stage: deploy
+  only:
+    - main
+  script:
+    - echo "Deploying to S3 or any other platform" # Replace with actual deployment script
+    # Example for deploying to S3:
+    # - aws s3 sync out/ s3://your-bucket-name --region $AWS_REGION
